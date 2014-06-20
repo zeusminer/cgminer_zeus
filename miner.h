@@ -217,6 +217,7 @@ enum drv_driver {
 	DRIVER_ZTEX,
 	DRIVER_BFLSC,
 	DRIVER_AVALON,
+	DRIVER_ZEUS,
 	DRIVER_MAX
 };
 
@@ -336,6 +337,7 @@ struct device_drv {
 
 	/* Highest target diff the device supports */
 	double max_diff;
+	double working_diff;
 };
 
 extern struct device_drv *copy_drv(struct device_drv*);
@@ -429,7 +431,7 @@ struct cgpu_info {
 #ifdef USE_USBUTILS
 		struct cg_usb_device *usbdev;
 #endif
-#if defined(USE_ICARUS) || defined(USE_AVALON)
+#if defined(USE_ICARUS) || defined(USE_AVALON) || defined(USE_ZEUS)
 		int device_fd;
 #endif
 	};
@@ -842,6 +844,14 @@ extern bool opt_worktime;
 #ifdef USE_AVALON
 extern char *opt_avalon_options;
 #endif
+#ifdef USE_ZEUS
+extern bool opt_ltc_debug;
+extern bool opt_ltc_nocheck_golden;
+extern bool opt_nocheck_scrypt;
+extern int opt_chips_count;
+extern int opt_chip_clk;
+extern int opt_zeus_readcount;
+#endif
 #ifdef USE_USBUTILS
 extern char *opt_usb_select;
 extern int opt_usbdump;
@@ -1161,6 +1171,9 @@ struct work {
 	unsigned char	target[32];
 	unsigned char	hash[32];
 
+#ifdef USE_SCRYPT
+	unsigned char	device_target[32];
+#endif
 	double		device_diff;
 	uint64_t	share_diff;
 

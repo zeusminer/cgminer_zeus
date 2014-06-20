@@ -58,9 +58,9 @@
 	#include <sys/wait.h>
 #endif
 
-#if defined(USE_BITFORCE) || defined(USE_ICARUS) || defined(USE_AVALON) || defined(USE_MODMINER)
+#if defined(USE_BITFORCE) || defined(USE_ICARUS) || defined(USE_AVALON) || defined(USE_MODMINER) || defined(USE_ZEUS)
 #	define USE_FPGA
-#if defined(USE_ICARUS) || defined(USE_AVALON)
+#if defined(USE_ICARUS) || defined(USE_AVALON) || defined(USE_ZEUS)
 #	define USE_FPGA_SERIAL
 #endif
 #elif defined(USE_ZTEX)
@@ -145,18 +145,21 @@ bool opt_worktime;
 #ifdef USE_AVALON
 char *opt_avalon_options = NULL;
 #endif
+
+#ifdef USE_ZEUS
+	bool opt_ltc_debug = false;
+	bool opt_ltc_nocheck_golden = false;
+	bool opt_nocheck_scrypt = false;
+	int opt_chips_count = 1;
+	int opt_chip_clk = 200; //MegaHz
+	int opt_zeus_readcount = 300;
+#endif
+
 #ifdef USE_USBUTILS
 char *opt_usb_select = NULL;
 int opt_usbdump = -1;
 bool opt_usb_list_all;
 #endif
-
-bool opt_ltc_debug = false;
-bool opt_ltc_nocheck_golden = false;
-bool opt_nocheck_scrypt = false;
-int opt_chips_count = 1;
-int opt_chip_clk = 200; //MegaHz
-
 
 char *opt_kernel_path;
 char *cgminer_path;
@@ -1011,8 +1014,6 @@ static struct opt_table opt_config_table[] = {
 		     "Override sha256 kernel to use (diablo, poclbm, phatk or diakgcn) - one value or comma separated"),
 #endif
 #ifdef USE_ICARUS
-
-#if 0
 	OPT_WITH_ARG("--icarus-options",
 		     set_icarus_options, NULL, NULL,
 		     opt_hidden),
@@ -1021,8 +1022,7 @@ static struct opt_table opt_config_table[] = {
 		     opt_hidden),
 #endif
 
-
-		 
+#ifdef USE_ZEUS
 OPT_WITHOUT_ARG("--ltc-debug",
 			 opt_set_bool, &opt_ltc_debug,
 			 "Enable ltc debug output"),
@@ -1043,8 +1043,11 @@ OPT_WITH_ARG("--chips-count",
 OPT_WITH_ARG("--ltc-clk",
 		 set_int_1_to_65535, opt_show_intval, &opt_chip_clk,
 		 "clock Mhz"),
-
+OPT_WITH_ARG("--zeus-readcount",
+		 set_int_1_to_65535, opt_show_intval, &opt_zeus_readcount,
+		 "readcount (seconds*10) timeout to start a new work"),
 #endif
+
 #ifdef USE_AVALON
 	OPT_WITH_ARG("--avalon-options",
 		     set_avalon_options, NULL, NULL,
@@ -1176,7 +1179,6 @@ OPT_WITH_ARG("--ltc-clk",
 			opt_hidden
 #endif
 	),
-
 	OPT_WITH_ARG("--url|-o",
 		     set_url, NULL, NULL,
 		     "URL for bitcoin JSON-RPC server"),
@@ -1368,6 +1370,9 @@ static char *opt_verusage_and_exit(const char *extra)
 #endif
 #ifdef USE_AVALON
 		"avalon "
+#endif
+#ifdef USE_ZEUS
+		"zeus "
 #endif
 #ifdef USE_MODMINER
 		"modminer "
@@ -2288,6 +2293,7 @@ share_result(json_t *val, json_t *res, json_t *err, const struct work *work,
 		pool->accepted++;
 		cgpu->diff_accepted += work->work_difficulty;
 		total_diff_accepted += work->work_difficulty;
+		total_diff1 += work->device_diff;
 		pool->diff_accepted += work->work_difficulty;
 		mutex_unlock(&stats_lock);
 
@@ -5511,7 +5517,6 @@ void submit_nonce(struct thr_info *thr, struct work *work, uint32_t nonce)
 	*work_nonce = htole32(nonce);
 
 	mutex_lock(&stats_lock);
-	total_diff1 += work->device_diff;
 	thr->cgpu->diff1 += work->device_diff;
 	work->pool->diff1 += work->device_diff;
 	mutex_unlock(&stats_lock);
@@ -5529,17 +5534,18 @@ void submit_nonce(struct thr_info *thr, struct work *work, uint32_t nonce)
 			inc_hw_errors(thr);
 			return;
 		}
-		if (!fulltest(hash2, work->target)) {
-			applog(LOG_INFO, "Share below target");
-			return;
-		}	
 
 	}	
 	mutex_lock(&stats_lock);
 	thr->cgpu->last_device_valid_work = time(NULL);
 	mutex_unlock(&stats_lock);
 
-
+	if(opt_nocheck_scrypt==false){
+		if (!fulltest(hash2, work->target)) {
+			applog(LOG_INFO, "Share below target");
+			return;
+		}
+	}
 
 	submit_work_async(work, &tv_work_found);
 }
@@ -6241,8 +6247,8 @@ static void *watchpool_thread(void __maybe_unused *userdata)
  * the screen at regular intervals, and restarts threads if they appear to have
  * died. */
 #define WATCHDOG_INTERVAL		2
-#define WATCHDOG_SICK_TIME		300
-#define WATCHDOG_DEAD_TIME		1800
+#define WATCHDOG_SICK_TIME		180
+#define WATCHDOG_DEAD_TIME		600
 #define WATCHDOG_SICK_COUNT		(WATCHDOG_SICK_TIME/WATCHDOG_INTERVAL)
 #define WATCHDOG_DEAD_COUNT		(WATCHDOG_DEAD_TIME/WATCHDOG_INTERVAL)
 
@@ -6772,6 +6778,10 @@ extern struct device_drv icarus_drv;
 extern struct device_drv avalon_drv;
 #endif
 
+#ifdef USE_ZEUS
+extern struct device_drv zeus_drv;
+#endif
+
 #ifdef USE_MODMINER
 extern struct device_drv modminer_drv;
 #endif
@@ -6870,6 +6880,10 @@ void fill_device_drv(struct cgpu_info *cgpu)
 		drv->flush_work = &noop_flush_work;
 	if (!drv->queue_full)
 		drv->queue_full = &noop_queue_full;
+	if (!drv->max_diff)
+		drv->max_diff = 1;
+	if (!drv->working_diff)
+		drv->working_diff = 1;
 }
 
 void enable_device(struct cgpu_info *cgpu)
@@ -7239,12 +7253,17 @@ int main(int argc, char *argv[])
 #endif
 
 #ifdef USE_ICARUS
+	if (!opt_scrypt)
 		icarus_drv.drv_detect();
 #endif
 
 #ifdef USE_AVALON
 	if (!opt_scrypt)
 		avalon_drv.drv_detect();
+#endif
+
+#ifdef USE_ZEUS
+		zeus_drv.drv_detect();
 #endif
 
 #ifdef USE_BFLSC

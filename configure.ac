@@ -236,10 +236,10 @@ if test "x$bitforce" = xyes; then
 fi
 AM_CONDITIONAL([HAS_BITFORCE], [test x$bitforce = xyes])
 
-icarus="yes"
+icarus="no"
 
 AC_ARG_ENABLE([icarus],
-	[AC_HELP_STRING([--enable-icarus],[Compile support for Icarus (default enabled)])],
+	[AC_HELP_STRING([--enable-icarus],[Compile support for Icarus (default disabled)])],
 	[icarus=$enableval]
 	)
 if test "x$icarus" = xyes; then
@@ -257,6 +257,18 @@ if test "x$avalon" = xyes; then
 	AC_DEFINE([USE_AVALON], [1], [Defined to 1 if Avalon support is wanted])
 fi
 AM_CONDITIONAL([HAS_AVALON], [test x$avalon = xyes])
+
+zeus="yes"
+
+AC_ARG_ENABLE([zeus],
+	[AC_HELP_STRING([--enable-zeus],[Compile support for Zeus Miner (default enabled)])],
+	[zeus=$enableval]
+	)
+if test "x$zeus" = xyes; then
+	AC_DEFINE([USE_ZEUS], [1], [Defined to 1 if Zeus support is wanted])
+fi
+AM_CONDITIONAL([HAS_ZEUS], [test x$zeus = xyes])
+
 
 modminer="no"
 
@@ -280,7 +292,7 @@ if test "x$ztex" = xyes; then
 fi
 AM_CONDITIONAL([HAS_ZTEX], [test x$ztex = xyes])
 
-curses="no"
+curses="auto"
 
 AC_ARG_WITH([curses],
 	[AC_HELP_STRING([--without-curses],[Compile support for curses TUI (default enabled)])],
@@ -304,7 +316,7 @@ else
 	])
 fi
 
-AM_CONDITIONAL([NEED_FPGAUTILS], [test x$avalon$icarus$bitforce$modminer$ztex != xnonononono])
+AM_CONDITIONAL([NEED_FPGAUTILS], [test x$avalon$icarus$bitforce$modminer$zeus$ztex != xnononononono])
 AM_CONDITIONAL([NEED_USBUTILS_C], [test x$bitforce$modminer$bflsc != xnonono])
 AM_CONDITIONAL([HAVE_CURSES], [test x$curses = xyes])
 AM_CONDITIONAL([WANT_JANSSON], [test x$request_jansson = xtrue])
@@ -468,11 +480,11 @@ echo
 
 echo "  curses.TUI...........: $cursesmsg"
 
-	if test "x$scrypt" != xno; then
-		echo "  scrypt...............: Enabled"
-	else
-		echo "  scrypt...............: Disabled"
-	fi
+if test "x$scrypt" != xno; then
+	echo "  scrypt...............: Enabled"
+else
+	echo "  scrypt...............: Disabled"
+fi
 
 if test "x$opencl" != xno; then
 	if test $found_opencl = 1; then
@@ -480,14 +492,14 @@ if test "x$opencl" != xno; then
 
 	else
 		echo "  OpenCL...............: NOT FOUND. GPU mining support DISABLED"
-		if test "x$bitforce$avalon$icarus$ztex$modminer$bflsc" = xnononononono; then
+		if test "x$bitforce$avalon$zeus$icarus$ztex$modminer$bflsc" = xnonononononono; then
 			AC_MSG_ERROR([No mining configured in])
 		fi
 		echo "  scrypt...............: Disabled (needs OpenCL)"
 	fi
 else
 	echo "  OpenCL...............: Detection overrided. GPU mining support DISABLED"
-	if test "x$bitforce$icarus$avalon$ztex$modminer$bflsc" = xnononononono; then
+	if test "x$bitforce$icarus$avalon$zeus$ztex$modminer$bflsc" = xnonononononono; then
 		AC_MSG_ERROR([No mining configured in])
 	fi
 fi
@@ -513,6 +525,12 @@ if test "x$bflsc" = xyes; then
 	echo "  BFL.ASICs............: Enabled"
 else
 	echo "  BFL.ASICs............: Disabled"
+fi
+
+if test "x$zeus" = xyes; then
+	echo "  ZEUS.ASICs...........: Enabled"
+else
+	echo "  ZEUS.ASICs...........: Disabled"
 fi
 
 if test "x$bitforce" = xyes; then

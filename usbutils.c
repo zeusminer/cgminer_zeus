@@ -45,6 +45,10 @@
 #define DRV_AVALON 6
 #endif
 
+#ifdef USE_ZEUS
+#define DRV_ZEUS 7
+#endif
+
 #define DRV_LAST -1
 
 #define USB_CONFIG 1
@@ -195,6 +199,10 @@ extern struct device_drv icarus_drv;
 
 #ifdef USE_AVALON
 extern struct device_drv avalon_drv;
+#endif
+
+#ifdef USE_ZEUS
+extern struct device_drv zeus_drv;
 #endif
 
 #define STRBUFLEN 256
@@ -1597,6 +1605,11 @@ static struct usb_find_devices *usb_check(__maybe_unused struct device_drv *drv,
 #ifdef USE_AVALON
 	if (drv->drv_id == DRIVER_AVALON)
 		return usb_check_each(DRV_AVALON, drv, dev);
+#endif
+
+#ifdef USE_ZEUS
+	if (drv->drv_id == DRIVER_ZEUS)
+		return usb_check_each(DRV_ZEUS, drv, dev);
 #endif
 
 	return NULL;
